@@ -1,0 +1,115 @@
+Processing request of type ListToolsRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type ListToolsRequest
+Processing request of type CallToolRequest
+Processing request of type ListToolsRequest
+Processing request of type CallToolRequest
+Processing request of type ListToolsRequest
+Processing request of type CallToolRequest
+Processing request of type ListToolsRequest
+Processing request of type CallToolRequest
+Processing request of type ListToolsRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+============================================================
+IoT MCP Agent — Illustrative Implementation
+Model: claude-sonnet-4-5
+============================================================
+
+[Discovery] Connecting to MCP server ...
+             Tools  : ['read_sensor', 'list_sensors', 'set_thermostat', 'read_thermostat']
+             Sensors: ['TEMP-04', 'TEMP-05', 'HUM-01']
+
+
+============================================================
+Scenario 1: Environmental Check
+============================================================
+
+Request: "Check all sensors. Normal ranges: temperature 18–24 °C, humidity 30–60 %. Report which sensors, if any, are outside their normal range."
+
+[Orchestrator] Decomposed into 3 sub-task(s) (code-driven, from device registry):
+               · TEMP-04 (temperature)
+               · TEMP-05 (temperature)
+               · HUM-01 (humidity)
+
+[Orchestrator] Spawned 3 AgentSession(s); each gets its own MCP Client
+
+[Agents] Running concurrently ...
+
+[Concurrency] Session timing (seconds from first session start):
+  Session        Start      End   Duration
+  TEMP-04        0.000    3.295     3.295s
+  TEMP-05        0.000    3.837     3.837s
+  HUM-01         0.000    3.307     3.307s
+  → Overlap confirmed: all sessions active simultaneously for ≥3.295s
+
+[Concurrency] First LLM call window per session (seconds from first session start):
+  Session       LLM Start   LLM End   Duration
+  TEMP-04           0.306     2.153     1.847s
+  TEMP-05           0.302     2.400     2.098s
+  HUM-01            0.298     2.120     1.821s
+  → LLM calls overlapped for ≥1.813s (non-blocking)
+
+[Agents] Raw MCP results:
+         TEMP-04: Sensor: TEMP-04 | Type: temperature | Value: 17.2°C | Timestamp: 2026-09-21T10:52:43Z
+         TEMP-05: Sensor: TEMP-05 | Type: temperature | Value: 24.2°C | Timestamp: 2026-09-21T10:52:43Z
+         HUM-01: Sensor: HUM-01 | Type: humidity | Value: 58.2% | Timestamp: 2026-09-21T10:52:43Z
+
+[Orchestrator] Evaluating against normal ranges ...
+
+=== Aggregated Report ===
+  TEMP-04 (temperature): 17.2°C  [OUT OF RANGE]  normal: 18.0–24.0°C
+  TEMP-05 (temperature): 24.2°C  [OUT OF RANGE]  normal: 18.0–24.0°C
+  HUM-01 (humidity): 58.2%  [OK]  normal: 30.0–60.0%
+
+  CONFLICT: temperature sensors ['TEMP-04', 'TEMP-05'] differ by 7.0°C (>2.0°C) — manual verification advised
+
+  Sensors outside normal range: ['TEMP-04', 'TEMP-05']
+
+
+============================================================
+Scenario 2: Thermostat Control
+============================================================
+
+Request: "Set the office room temperature to 28°C."
+
+[Orchestrator] Calling LLM to decompose request into agent roles ...
+[Orchestrator] Roles parsed from LLM output
+[Orchestrator] 2 role(s) returned by LLM:
+               · controller — tool: set_thermostat, room: office, target: 28°C
+               · monitor — tool: read_thermostat, room: office, target: 28°C
+
+[Orchestrator] Spawned controller + monitor agents for room 'office'
+[Orchestrator] Controller and monitor running concurrently ...
+
+  [Monitor:office] Polling every 3s until 28.0°C ...
+  [Monitor:office] 20.0°C  (+0s)
+  [Monitor:office] 20.5°C  (+3s)
+  [Monitor:office] 21.6°C  (+6s)
+  [Monitor:office] 22.6°C  (+9s)
+  [Monitor:office] 23.7°C  (+12s)
+  [Monitor:office] 24.7°C  (+15s)
+  [Monitor:office] 25.8°C  (+18s)
+  [Monitor:office] 26.8°C  (+21s)
+  [Monitor:office] 27.9°C  (+24s)
+  [Monitor:office] 28.0°C  (+27s)
+
+[Monitor] 28.0°C reached — final 28.0°C after 27s — signalling orchestrator.
+[Orchestrator] Controller already completed: Thermostat set | Room: office | Target: 28.0°C | Current: 20.0°C | Status: heating_started
+[Orchestrator] Cancellation outcome: NOT NEEDED (controller completed 23.4s before monitor)
+
+[Orchestrator] Requesting final summary from LLM ...
+
+[LLM] The office thermostat successfully increased the temperature from 20°C to the target of 28°C in 27 seconds, heating at a steady rate of approximately 0.3°C per second.
+
+============================================================
+Run complete.
+============================================================
